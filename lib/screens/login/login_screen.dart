@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_stock/services/rest_api.dart';
 import 'package:flutter_stock/themes/styles.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -12,6 +16,36 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
 
   String email, password;
+
+  // Loading...
+  bool _isLoading = false;
+
+  // Alert Dialog
+  showAlertDialog(BuildContext context, String msg){
+    AlertDialog alert = AlertDialog(
+      title: Text('Login Status'),
+      content: Text(msg),
+      actions: <Widget>[
+        FlatButton(
+        onPressed: (){
+          Navigator.of(context).pop();
+        }, 
+        child: Text('OK')
+      )
+      ],
+    );
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context){
+        return alert;
+      }
+    );
+  }
+
+  TextEditingController mailController = TextEditingController();
+  TextEditingController passwordController = TextEditingController();
+  
 
   Widget _buildLogo() {
     return Row(
@@ -36,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Padding(
       padding: EdgeInsets.all(8),
       child: TextFormField(
+        controller: mailController,
         keyboardType: TextInputType.emailAddress,
         onChanged: (value) {
           setState(() {
@@ -52,11 +87,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-
   Widget _buildPasswordRow() {
     return Padding(
       padding: EdgeInsets.all(8),
       child: TextFormField(
+        controller: passwordController,
         keyboardType: TextInputType.text,
         obscureText: true,
         onChanged: (value) {
@@ -75,7 +110,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-
   Widget _buildForgetPasswordButton() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
@@ -83,7 +117,10 @@ class _LoginScreenState extends State<LoginScreen> {
       children: <Widget>[
         FlatButton(
           onPressed: () {},
-          child: Text("Forgot Password", style: TextStyle(color: appTheme().primaryColor),),
+          child: Text(
+            "Forgot Password",
+            style: TextStyle(color: appTheme().primaryColor),
+          ),
         ),
       ],
     );
@@ -101,9 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30.0),
             ),
-            onPressed: (){},
+            onPressed: _login,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 10.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 40.0, vertical: 10.0),
               child: Text(
                 "Login",
                 style: TextStyle(
@@ -118,7 +156,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ],
     );
   }
-
 
   Widget _buildOrRow() {
     return Row(
@@ -162,11 +199,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-
         SizedBox(
           width: 20,
         ),
-
         GestureDetector(
           onTap: () {},
           child: Container(
@@ -192,7 +227,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-
   // การรวม Widget ด้านบนทั้งหมดเข้ามา
   Widget _buildContainer() {
     return Row(
@@ -216,7 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
                     Padding(
-                      padding: const EdgeInsets.only(top:20.0),
+                      padding: const EdgeInsets.only(top: 20.0),
                       child: Text(
                         "Login",
                         style: TextStyle(
@@ -243,34 +277,98 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-       child: Scaffold(
-         body: SingleChildScrollView(
-            child: Stack(
-            children: <Widget>[
-              Container(
-                height: MediaQuery.of(context).size.height * 0.7,
-                width: MediaQuery.of(context).size.width,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: appTheme().primaryColor,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: const Radius.circular(70),
-                      bottomRight: const Radius.circular(70),
+      child: Scaffold(
+        body: Center(
+          child: SingleChildScrollView(
+            child: _isLoading ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(15.0),
+                child: Column(
+                  children: <Widget>[
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    Text('กำลังตรวจสอบข้อมูล')
+                  ],
+                ),
+              ),
+            ) 
+            : Stack(
+              children: <Widget>[
+                Container(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  width: MediaQuery.of(context).size.width,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: appTheme().primaryColor,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: const Radius.circular(70),
+                        bottomRight: const Radius.circular(70),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  _buildLogo(),
-                  _buildContainer(),
-                ],
-              )
-            ],  
-           ),
-         ),
-       ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    _buildLogo(),
+                    _buildContainer(),
+                  ],
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
+
+  // ส่วนของการเขียน login การ Login
+  void _login() async {
+
+    // สร้างตัวเก็บข้อมูลแบบ SharedPreferences
+    SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+
+    // แสดง Loading
+    setState(() {
+      _isLoading = true;
+    });
+
+    // รับค่ามาเก็บลอง list
+    var userData = {
+      'email': mailController.text,
+      'password': passwordController.text
+    };
+
+    // Call API
+    var response = await CallAPI().postData(userData, 'login');
+    var body = json.decode(response.body);
+    print(body);
+
+    if(body['success']){
+      // ซ่อน Loading
+      setState(() {
+      _isLoading = false;
+      });
+      // print('Login success');
+      showAlertDialog(context, "Login Success");
+
+      // การสร้างตัวแปรเก็บลง sharedPreferences
+      sharedPreferences.setString("storeName", body['data']['name']);
+      sharedPreferences.setString("storeEmail", body['data']['email']);
+
+      // ส่งไปหน้า dashboard
+      Navigator.pushNamed(context, '/dashboard');
+    }else{
+      // ซ่อน Loading
+      setState(() {
+      _isLoading = false;
+      });
+      // print('Login fail');
+      showAlertDialog(context, "Login Fail!");
+    }
+
+  }
+
 }
+
+
